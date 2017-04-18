@@ -3,9 +3,10 @@ This repository contains the material used in the workshop "Working with 3D poin
 
 For the workshop, participants will need:
 
-Python 2.7: you can get with different installations such as 
-  PythonXY (https://python-xy.github.io/downloads.html) **Only for Windows
-  Anaconda (https://www.continuum.io/downloads) **Windows, Linux and MAC
+Python 2.7: you can get with different installations such as PythonXY* (https://python-xy.github.io/downloads.html) or Anaconda** (https://www.continuum.io/downloads) 
+
+*Only for Windows
+**Windows, Linux and MAC
 
 Note: PythonXY already comes with most packages needed for the workshop. With Anaconda, most of them must be installed manually. If you don't know how to install packages in Anaconda, please check this link (https://conda.io/docs/using/pkgs.html).
 
@@ -27,4 +28,5 @@ In case there are any question, contact me at any time.
 See you soon in Basel!!
 
 João Paulo Pereira
+
 joao.pereira@felis.uni-freiburg.de
