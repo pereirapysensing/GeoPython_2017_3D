@@ -5,9 +5,9 @@ For the workshop, participants will need:
 
 Python 2.7: you can get with different installations such as 
   PythonXY (https://python-xy.github.io/downloads.html) **Only for Windows
-	Anaconda (https://www.continuum.io/downloads) **Windows, Linux and MAC
+  Anaconda (https://www.continuum.io/downloads) **Windows, Linux and MAC
 
-	Note: PythonXY already comes with most packages needed for the workshop. With Anaconda, most of them must be installed manually. If you don't know how to install packages in Anaconda, please check this link (https://conda.io/docs/using/pkgs.html).
+Note: PythonXY already comes with most packages needed for the workshop. With Anaconda, most of them must be installed manually. If you don't know how to install packages in Anaconda, please check this link (https://conda.io/docs/using/pkgs.html).
 
 Packages needed in this workshop are the following:
 	Numpy
