@@ -10,13 +10,13 @@ Python 2.7: you can get with different installations such as
 Note: PythonXY already comes with most packages needed for the workshop. With Anaconda, most of them must be installed manually. If you don't know how to install packages in Anaconda, please check this link (https://conda.io/docs/using/pkgs.html).
 
 Packages needed in this workshop are the following:
-	Numpy
-	Scipy
-	Gdal
-	Mayavi
-	Laspy
-	matplotlib
-	PIL (Pillow)
+	Numpy,
+	Scipy,
+	Gdal,
+	Mayavi,
+	Laspy,
+	matplotlib,
+	PIL
 
 In addition, we will use a 3D point cloud viewer (LAS files). Quick Terrain Reader (http://appliedimagery.com/download/) will be used during the workshop but feel free	to use any software that can show LAS files.
 
