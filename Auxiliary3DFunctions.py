@@ -22,10 +22,14 @@ import os
 from linecache import getline
 import numpy as np
 import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 from matplotlib.mlab import normpdf
-import colorsys
+#import colorsys
 from scipy import interpolate
-import gdal, ogr, osr
+try:
+    import gdal, ogr, osr
+except ImportError:
+    from osgeo import gdal, ogr, osr
 from mayavi.mlab import points3d, colorbar
 try:
     import laspy
@@ -37,7 +41,7 @@ try:
     import Image
     import ImageOps
 except:
-    from PIL import Image, ImageOps
+    from PIL import Image
 
 
 def import_las(path, array=True):
@@ -179,11 +183,14 @@ def plot_las(data, num_bins=100, color='red', xlabel=None, ylabel=None, title=No
                                normed=True)
     # add a 'best fit' line
     k = normpdf(bins, mu, sigma)
-    ax.plot(bins, k, '--', linewidth=3)
+    ax.plot(bins, k, 'k--', linewidth=2)
     if xlabel != ylabel != title != None:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        ax.set_xlabel(xlabel, fontsize=16)
+        ax.set_ylabel(ylabel, fontsize=16)
         ax.set_title(title)
+    plt.ylim(0.0,0.15)
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.grid()
     plt.show()
 
 def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
@@ -220,21 +227,27 @@ def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
     """
     # Get the x axis distance
     xdist = max(x) - min(x)
+    
     # Get the y axis distance
     ydist = max(y) - min(y)
+    
     # Number of columns for our grid
     cols = int((xdist) / cell)
+    
     # Number of rows for our grid
     rows = int((ydist) / cell)
+    
     cols += 1
     rows += 1
     print cols
     print rows
+    
     # Track how many elevation
     # values we aggregate
     count = np.zeros((rows, cols)).astype(np.float32)
     # Aggregate elevation values
     zsum = np.zeros((rows, cols)).astype(np.float32)
+    
     # Y resolution is negative
     ycell = -1 * cell
     # Project x,y values to grid
@@ -243,16 +256,19 @@ def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
     # Cast to integers and clip for use as index
     ix = projx.astype(np.int32)
     iy = projy.astype(np.int32)
+    
     # Loop through x,y,z arrays, add to grid shape,
     # and aggregate values for averaging
     for x_,y_,z_ in np.nditer([ix, iy, z]):
         count[y_, x_]+=1
         zsum[y_, x_]+=z_
+        
     # Change 0 values to 1 to avoid numpy warnings, 
     # and NaN values in array
     nonzero = np.where(count>0, count, 1)
     # Average our z values
     zavg = zsum/nonzero
+    
     # Interpolate 0 values in array to avoid any
     # holes in the grid
     mean = np.ones((rows,cols)) * np.mean(zavg)
@@ -261,9 +277,10 @@ def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
     right = np.roll(zavg, 1, 1)
     ravg = np.where(right>0,right,mean)
     interpolate = (lavg+ravg)/2
-    fill1=np.where(zavg>0,zavg,interpolate)
-    fill2=np.where(zavg==0,NODATA,interpolate)
-    fill = fill1 + fill2
+    fill=np.where(zavg>0,zavg,interpolate)
+#    fill2=np.where(zavg==0,NODATA,interpolate)
+#    fill = fill1 + fill2
+    
     # Create our ASCII DEM header
     header = "ncols        {}\n".format(fill.shape[1])
     header += "nrows        {}\n".format(fill.shape[0])
@@ -271,6 +288,7 @@ def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
     header += "yllcorner    {}\n".format(min(y))
     header += "cellsize     {}\n".format(cell)
     header += "NODATA_value      {}\n".format(NODATA)
+    
     # Open the output file, add the header, save the array
     with open(target, "w") as f:
         f.write(header)
@@ -278,7 +296,7 @@ def las2grid(x, y, z, cell=0.5, NODATA=-9999, target='C:/grid.asc'):
     
     return fill
 
-def lasinterpolated(x,y,z,xnumIndexes,ynumIndexes, method, fill_value, contour=False, plot=True):
+def lasinterpolated(source,target,x,y,z,method,fill_value,EPSG,contour=False,plot=True):
     """
     lasinterpolated(...)
         lasinterpolated(x, 
@@ -307,10 +325,10 @@ def lasinterpolated(x,y,z,xnumIndexes,ynumIndexes, method, fill_value, contour=F
             x and y.
             
         xnumIndexes : integer type.
-            Size fo the final image on the North axis, ie the Y in the las file.
+            Size of the final image on the North axis, i.e. the Y in the las file.
         
         ynumIndexes :  integer type.
-            Size fo the final image on the East axis, ie the X in the las file.
+            Size of the final image on the East axis, i.e. the X in the las file.
         
         method : {'linear', 'nearest', 'cubic'}.
             Method of interpolation. One of
@@ -347,9 +365,19 @@ def lasinterpolated(x,y,z,xnumIndexes,ynumIndexes, method, fill_value, contour=F
         plot : bool type.
             Plots the interpolated image if set to True.
     """
+    # get the geo infomation
+    ds = gdal.Open(source)
+    geotransform = ds.GetGeoTransform()
+    dimensions = ds.ReadAsArray()
+    print dimensions.shape[0]
+    print dimensions.shape[1]
+    
+    
     # Prepares the grid that will be used as base for the interpolation 
-    xi = np.linspace(np.min(x), np.max(x),ynumIndexes)
-    yi = np.linspace(np.min(y), np.max(y),xnumIndexes)
+    xi = np.linspace(np.min(x), np.max(x),dimensions.shape[1])
+    print xi.shape
+    yi = np.linspace(np.min(y), np.max(y),dimensions.shape[0])
+    print yi.shape
     XI, YI = np.meshgrid(xi, yi)
     
     # Set the 2D coodinates in a single array to be used in the interpolation
@@ -365,6 +393,34 @@ def lasinterpolated(x,y,z,xnumIndexes,ynumIndexes, method, fill_value, contour=F
                                (XI,YI), 
                                method=method, 
                                fill_value=fill_value)
+    dem = DEM[::-1,:]
+    # get the geo infomation
+    ds = gdal.Open(source)
+    geotransform = ds.GetGeoTransform()
+    
+    
+    # Create and save the GeoTiff image with the correct EPSG
+    rows = DEM.shape[0]
+    cols = DEM.shape[1] 
+    dst_ds = gdal.GetDriverByName('GTiff').Create(target, cols, rows, 1, gdal.GDT_Byte)
+    
+    # specify coords
+    dst_ds.SetGeoTransform(geotransform)  
+    
+    # write RGB bands to the raster
+    dst_ds.GetRasterBand(1).WriteArray(dem) 
+    
+    # establish encoding
+    srs = osr.SpatialReference()     
+    
+    # Set lat/long vased on the EPSG
+#    srs.ImportFromEPSG(EPSG)                
+    dst_ds.SetProjection(srs.ExportToWkt())
+    
+    # write to disk
+    dst_ds.FlushCache()                    
+    dst_ds = None 
+    
     # Calculates the contour lines based on the elevation values when contour
     # is set to true.
     if contour==True:
@@ -505,6 +561,8 @@ def las2raster(source,
     with open(shadegrid, "wb") as f:
         f.write(header)
         np.savetxt(f, shaded, fmt="%4i")
+    
+    return slope, aspect, shaded
 
 def las2contour(source, target, interval, base): 
     """
@@ -634,7 +692,7 @@ def raster2color(red, green, blue, target, EPSG):
     srs = osr.SpatialReference()     
     
     # Set lat/long vased on the EPSG
-    srs.ImportFromEPSG(EPSG)                
+#    srs.ImportFromEPSG(EPSG)                
     dst_ds.SetProjection(srs.ExportToWkt())
     
     # write to disk
