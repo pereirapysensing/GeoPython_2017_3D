@@ -36,9 +36,17 @@ please reactivate the lines by removing the '#!!!'.
 
 Have fun  =) !!!!
 '''
-import Auxiliary3DFunctions as af
-import numpy as np
+# Import libraries
+import os
+os.chdir("F:\Joao\MEGA\Publications\GeoPython 2017\Workshop\GeoPython_2017_3D".replace("\\","/"))
+try:
+    import Auxiliary3DFunctions as af
+except ImportError:
+    print """Auxiliary3DFunctions was not found. Please contact 
+    João Paulo Pereira at joao.pereira@felis.uni-freiburg.de"""
 import math
+import numpy as np
+import matplotlib.pyplot as plt
 
 ##############################################################################
 ### Create a laspy object
@@ -46,144 +54,155 @@ import math
 # This object is what you will use for the rest of the time. You can access 
 # las file attributes(e.g. Classification, return number, intensity)
 las, x, y, z = af.import_las("data/points.las")
-print 'Type:', type(las)
-print 'Size:', len(x), 'points'
+print 'Data type: {}'.format(type(las))
+print 'Point cloud size: {} points'.format(len(x))
 
 ##############################################################################
 ### Now that we have the laspy object, we can access several attributes
 
 # Let's take a look how is the elevetation distribution.
 # Plotting the histogram for the elevation
-# af.plot_las(z,
-#          num_bins=100,
-#          color='red',
-#          xlabel='Elevation (meters)',
-#          ylabel='Frequency',
-#          title='Elevation distribution in the LAS file')
+af.plot_las(z,
+            num_bins=100,
+            color='red',
+            xlabel='Elevation (meters)',
+            ylabel='Frequency',
+            title='Elevation distribution in the LAS file')
+###############################################################################
+#### Let's see the point cloud to identify what is wrong
+#
+af.view_las(x, y, z, z, title='Elevation')
+#
+###############################################################################
+#### Let's remove some of this noise first and then plot the histogram again.
+#
+## Remove all points with elevation equal or abouve 100 meters
+mask = np.where(z>=100)
+xc, yc, zc = (np.delete(x, mask),
+              np.delete(y, mask),
+              np.delete(z, mask))
+#
+## Plotting the histogram for the elevation, now without the noise
+af.plot_las(zc,
+            num_bins=100,
+            color='orange',
+            xlabel='Elevation (meters)',
+            ylabel='Frequency',
+            title='Elevation distribution without outlier in the LAS file')
+#
+## ##############################################################################
+## ### Now, the point cloud should look fine
+##
+af.view_las(xc,yc,zc,zc, title='Elevation')
+##
+## ##############################################################################
+## ### Now, we should see if our LiDAR data is classified...
+##
+## # Create a new variable with the classification information
+las_class = np.array(las.classification, dtype='int8')
+las_class = np.delete(las_class, mask) #Remove the noise points
+print 'Smaller class (Unclassified):', min(las_class)
+print 'Bigger class (Noise):', max(las_class)
+##
+## ##############################################################################
+## ### Now, let's the point cloud with the classification information
+##
+af.view_las(xc,yc, zc, las_class, title='Classification')
+##
+## ##############################################################################
+## ### Prepare the data to generate images
+## # Point density from the metadata 24,41 points/m^2
+##
+## Get first returns for the Digital Surface Model (DSM)
+first_mask = np.where(las.return_num!=1)
+x_first, y_first, z_first = (np.delete(x, first_mask),
+                             np.delete(y, first_mask),
+                             np.delete(z, first_mask))
+print len(z_first)
+#
+z_first_mask = np.where(z_first>=100)
+x_first, y_first, z_first = (np.delete(x_first, z_first_mask),
+                             np.delete(y_first, z_first_mask),
+                             np.delete(z_first, z_first_mask))
+print len(z_first)
+##
+## ##############################################################################
+## # Plotting the histogram for the elevation, now without the noise
+af.plot_las(z_first,
+         num_bins=100,
+         color='brown',
+         xlabel='Elevation (meters)',
+         ylabel='Frequency',
+         title='Elevation distribution from first returns')
+##
 ##############################################################################
-### Let's see the point cloud to identify what is wrong
+# Now to calculate the DSM we need first to find the correct spatial resolution
+# using the point density information from the LAS file metadata (24,41 points/m^2)
+ideal_resolution = round(math.sqrt(1./24.41) + 0.1,2)
 
-# af.view_las(x, y, z, z, title='Elevation')
+# Then we apply the las2grid function to calculte the dsm
+image = af.las2grid(x_first,
+                    y_first,
+                    z_first,
+                    cell=ideal_resolution,
+                    NODATA=0.0,
+                    target=r'F:/geopython/dsm_python.asc')
+#
+###############################################################################
+# Let's work now with the digital terrain model (DTM).
+#First we need to filter the point cloud and select only points with
+# classification 2 (ground)
 
-##############################################################################
-### Let's remove some of this noise first and then plot the histogram again.
+# creates mask for classification 2                    
+ground_mask = np.where(las.classification==2)
 
-# Remove all points with elevation equal or abouve 100 meters
-# mask = np.where(z>=100)
-# xc, yc, zc = (np.delete(x, mask),
-#               np.delete(y, mask),
-#               np.delete(z, mask))
+#apply mask to data
+x_ground, y_ground, z_ground = (x[ground_mask],
+                                y[ground_mask],
+                                z[ground_mask])
 
-# Plotting the histogram for the elevation, now without the noise
-# af.plot_las(zc,
-#          num_bins=100,
-#          color='yellow',
-#          xlabel='Elevation (meters)',
-#          ylabel='Frequency',
-#          title='Elevation distribution without outlier in the LAS file')
+af.plot_las(z_ground,
+            num_bins=100,
+            color='grey',
+            xlabel='Elevation (meters)',
+            ylabel='Frequency',
+            title='Elevation distribution from ground points')
 
-# ##############################################################################
-# ### Now, the point cloud should look fine
+# we need the dsm to get the geoinformation
+source='F:/geopython/dsm_python.asc'
+
+# calculate the dtm using the function lasinterpolated
+dtm = af.lasinterpolated(source,
+                         "F:/geopython/dtm_python.tif",
+                         x_ground,
+                         y_ground,
+                         z_ground, 
+                         method='nearest', 
+                         fill_value=0.0,
+                         EPSG=26910,
+                         contour=False, 
+                         plot=True)
+###############################################################################
+# We can also calculate other products like slope, aspect and shaded images.
+products = af.las2raster(source,
+                         slopegrid = "F:/geopython/slope.asc",
+                         aspectgrid = "F:/geopython/aspect.asc",
+                         shadegrid = "F:/geopython/relief.asc")
+
+# from the dsm we can calculate contour lines
+af.las2contour(source, "F:/geopython/contour", 1, 10)
 #
-# af.view_las(xc,yc,zc,zc, title='Elevation')
-#
-# ##############################################################################
-# ### Now, we should see if our LiDAR data is classified...
-#
-# # Create a new variable with the classification information
-# las_class = np.array(las.classification, dtype='int8')
-# las_class = np.delete(las_class, mask) #Remove the noise points
-# print 'Smaller class:', min(las_class)
-# print 'Bigger class:', max(las_class)
-#
-# ##############################################################################
-# ### Now, let's the point cloud with the classification information
-#
-# af.view_las(x,y,z,z, title='Elevation')
-#
-# ##############################################################################
-# ### Prepare the data to generate images
-# # Point density from the metadata 24,41 points/m^2
-# ideal_resolution = round(math.sqrt(1./24.41) + 0.1,2)
-#
-# # Get first returns for the Digital Surface Model (DSM)
-# first_mask = np.where(las.return_num!=1)
-# x_first, y_first, z_first = (np.delete(x, first_mask),
-#                             np.delete(y, first_mask),
-#                             np.delete(z, first_mask))
-# print len(z_first)
-#
-# z_first_mask = np.where(z_first>=100)
-# x_first, y_first, z_first = (np.delete(x_first, z_first_mask),
-#                              np.delete(y_first, z_first_mask),
-#                              np.delete(z_first, z_first_mask))
-# print len(z_first)
-#
-# ##############################################################################
-# # Plotting the histogram for the elevation, now without the noise
-# af.plot_las(z_first,
-#          num_bins=100,
-#          color='cyan',
-#          xlabel='Elevation (meters)',
-#          ylabel='Frequency',
-#          title='Elevation distribution from first returns')
-#
-# image = af.las2grid(x_first,
-#                     y_first,
-#                     z_first,
-#                     cell=0.5,
-#                     NODATA=0.0,
-#                     target=r'/media/pereira/Data1/dsm_python.asc')
-#
-# ##############################################################################
-#
-# ground_mask = np.where(las.classification==2)
-#
-# x_ground, y_ground, z_ground = (np.array(x[ground_mask]),
-#                                 np.array(y[ground_mask]),
-#                                 np.array(z[ground_mask]))
-# print len(z_ground)
-#
-# z_ground_mask = np.where(z_ground>=100)
-# x_ground, y_ground, z_ground = (np.delete(x_ground, z_ground_mask),
-#                                 np.delete(y_ground, z_ground_mask),
-#                                 np.delete(z_ground, z_ground_mask))
-# print len(z_ground)
-#
-# source='D:/dtm_python.asc'
-#
-# af.las2raster(source,
-#            slopegrid = "/media/pereira/Data1/dtm_slope.asc",
-#            aspectgrid = "/media/pereira/Data1/dtm_aspect.asc",
-#            shadegrid = "/media/pereira/Data1/dtm_relief.asc")
-#
-# af.las2contour(source, "/media/pereira/Data1/dtm_contour", 1, 10)
-#
-# ##############################################################################
-#
-# af.plot_las(z_ground,
-#          num_bins=100,
-#          color='grey',
-#          xlabel='Elevation (meters)',
-#          ylabel='Frequency',
-#          title='Elevation distribution from ground points')
-#
-# image = af.las2grid(x_ground,
-#                     y_ground,
-#                     z_ground,
-#                     cell=0.5,
-#                     NODATA=0.0,
-#                     target=r'/media/pereira/Data1/dtm_python.asc')
-#
-# ##############################################################################
-#
-# source='D:/dsm_python.asc'
-#
-# af.las2raster(source,
-#            slopegrid = "/media/pereira/Data1/slope.asc",
-#            aspectgrid = "/media/pereira/Data1/aspect.asc",
-#            shadegrid = "/media/pereira/Data1/relief.asc")
-#
-# af.las2contour(source, "/media/pereira/Data1/contour", 1, 10)
-#
-# af.raster2color(source, target = "/media/pereira/Data1/lidar.bmp")
+#################################################################################            
+# Also create RGB images using different products combinations
+af.raster2color(source,
+                "F:/geopython/relief.asc",
+                "F:/geopython/slope.asc",
+                target="F:/geopython/colored.tif", 
+                EPSG=26910)
+"""
+###############################################################################
+#####################                                    ######################
+#####################              THANK YOU             ######################
+#####################                                    ######################
+###############################################################################
+"""
