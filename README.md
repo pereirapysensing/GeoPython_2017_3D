@@ -23,6 +23,8 @@ In addition, we will use a 3D point cloud viewer (LAS files). Quick Terrain Read
 
 Last but not least, QGIS will be used (http://www.qgis.org/en/site/forusers/download.html) to visualize the products we will generate during the workshop.
 
+The sample data that will be used during the course can be downloaded in this link (https://www.dropbox.com/sh/ibowwrcu98ab6vb/AACWmCjX53yJd5hNrwqRY7BLa?dl=0)
+
 In case there are any question, contact me at any time.
 
 See you soon in Basel!!
